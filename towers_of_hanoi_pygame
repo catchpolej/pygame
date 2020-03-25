@@ -1,0 +1,217 @@
+"""
+ towers_of_hanoi
+ python pygame towers of hanoi simluation attempt
+ author Jeremy Catchpole
+ date feb 2020
+"""
+
+# import the libraries needed
+import pygame
+
+# game constants
+WIDTH = 400
+HEIGHT = 400
+H_SPACING = WIDTH/4     # spacing between stacks
+V_SPACING = 12          # spacing between discs
+V_GAP = 2               # gap between discs
+
+# colours
+BLACK = (0,0,0)
+WHITE = (255,255,255)
+RED = (255,0,0)
+GREEN = (0,255,0)
+BLUE = (0,0,255)
+YELLOW = (255,255,0)
+
+# ask how many discs
+NUM_DISCS = 0
+while NUM_DISCS == 0:
+    temp = input("Enter desired number of discs (1-20): ")
+    try:
+        NUM_DISCS = int(temp)
+    except:
+        pass
+
+# ask simulation speed (frames per second)
+FPS = 0
+while FPS == 0:
+    temp = input("Enter simulation speed (0.1-100): ")
+    try:
+        FPS = float(temp)
+    except:
+        pass
+
+print(NUM_DISCS,"chosen")
+
+# initalise and create window
+pygame.init()
+pygame.mixer.init()
+screen = pygame.display.set_mode((WIDTH,HEIGHT))
+pygame.display.set_caption("py towers of hanoi")
+clock = pygame.time.Clock()
+
+# Create the sprite groups and add the sprites
+all_sprites = pygame.sprite.Group()
+
+# stack markers
+for i in range(1,4):
+    width = 0.98*H_SPACING
+    hpos = i*H_SPACING-width/2
+    # make the stack sprite
+    stack = pygame.sprite.Sprite()
+    stack.image = pygame.Surface((width, 5))
+    stack.image.fill(YELLOW)
+    stack.rect = stack.image.get_rect()
+    stack.rect.x = hpos
+    stack.rect.y = HEIGHT-V_SPACING*3
+    all_sprites.add(stack)
+
+
+# lists to hold simulation state
+discs = []  # list of disc sprites
+stack = []  # list of stack positions (1,2,3)
+            # discs start on stack 1
+
+# create discs and place in starting location on stack 1
+for i in range(NUM_DISCS):
+    # calcuate disc width (decreases with i)
+    # and vertical position (descrease with i) i.e. gets higher on screen
+    width = H_SPACING - i*H_SPACING/(1.6*NUM_DISCS)
+    vpos = HEIGHT-V_SPACING*(i+4)
+    # make the disc sprite
+    disc_sprite = pygame.sprite.Sprite()
+    disc_sprite.image = pygame.Surface((width,V_SPACING-V_GAP))
+    disc_sprite.image.fill(GREEN)
+    disc_sprite.rect = disc_sprite.image.get_rect()
+    disc_sprite.rect.x = H_SPACING-width/2
+    disc_sprite.rect.y = vpos
+    
+    discs.append(disc_sprite)
+    stack.append(1)
+    all_sprites.add(disc_sprite)
+
+# ##########################################################
+# blocking_id(disc_id, destination)
+# @params: the current disc number, the stack number it should move to
+# @returns: disc id of biggest smaller disc on the destination stack
+def blocking_id(disc_id, destination):
+    # if there is a higher disc_id on the destination stack then
+    # that is the one we want to move
+    for i in range(disc_id+1, NUM_DISCS):
+        if stack[i] == destination:
+            return i
+    return None
+
+# ##########################################################
+# new_destination(disc_id, destination)
+# @params: the current disc number, the stack number it should move to
+# @returns: the destination stack for the next disc
+def new_destination(disc_id, destination):
+    # Destination is on the other stack
+    # i.e. not where current disc or its destination is
+    if stack[disc_id]!=1 and destination!=1:
+        return 1
+    if stack[disc_id]!=2 and destination!=2:
+        return 2
+    if stack[disc_id]!=3 and destination!=3:
+        return 3
+    
+# ##########################################################
+# moveable(disc_id)
+# @params: the current disc number
+# @returns: boolean True if move is OK 
+# Is the disc free to move?
+def moveable(disc_id):
+    # if there is a higher disc_id on the stack then
+    # this disc cannot be moved
+    for i in range((disc_id+1), NUM_DISCS):
+        if stack[i] == stack[disc_id]:
+            return False
+    return True
+
+# ##########################################################
+# move_disc(disc_id, destination)
+# @params: the current disc number, the stack number it should move to      
+# Go ahead and move the disc
+def move_disc(disc_id, destination):
+    width = H_SPACING - disc_id*H_SPACING/(1.6*NUM_DISCS)
+    hpos = destination*H_SPACING-width/2
+    # print("rect.x of disc",disc_id,"set to",hpos)
+    discs[disc_id].rect.x = hpos
+
+    # count larger discs on this stack (lower disc number)
+    j = 0
+    for i in range(0, disc_id):
+        if stack[i] == destination:
+            j += 1
+    vpos = HEIGHT-V_SPACING*(j+4)
+    discs[disc_id].rect.y = vpos
+
+    stack[disc_id] = destination
+    
+    
+# ##########################################################
+# move(disc_id, destination)
+# @params: the current disc number, the stack number it should move to
+# @returns: the disc number that gets moved
+# See if the disc can be moved to the desired destination
+# if the disc cannot be moved RECURSE to get to correct disc
+def move(disc_id, destination):
+
+    # If current is at its destination then smaller one should join us
+    if stack[disc_id] == destination:
+        return move(disc_id+1,destination)
+    
+    # Are we able to move this disc
+    if(moveable(disc_id)):
+        # Is there a blocking disc?
+        blocker = blocking_id(disc_id, destination)
+        if(blocker==None):
+            move_disc(disc_id, destination)
+            return disc_id
+        else:
+        # get the blocker one off my destination
+            return move(blocker, new_destination(disc_id, destination))
+        
+    # move the next smallest disc
+    else:
+        return move(disc_id+1, new_destination(disc_id, destination))
+
+
+
+# simulation loop
+cur_disc = 0                # Start with the base disc
+while cur_disc < NUM_DISCS:
+    # wait for clock tick
+    clock.tick(FPS)
+     
+    # Process inputs / events
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # update
+    all_sprites.update()
+    
+    # draw / render
+    screen.fill(BLACK)
+    all_sprites.draw(screen)
+    pygame.display.flip()
+
+    # purpose of simulation is to move the discs to stack 3
+    disc_id = move(cur_disc,3)
+    
+    if disc_id == cur_disc:         # moved the disc we are on
+        print("Moved disc",disc_id)
+        cur_disc += 1               # move onto the next disc
+
+# update
+all_sprites.update()
+# draw / render
+screen.fill(BLACK)
+all_sprites.draw(screen)
+pygame.display.flip()
+
+input("Simulation complete (press enter):")
+pygame.quit()
+quit()
